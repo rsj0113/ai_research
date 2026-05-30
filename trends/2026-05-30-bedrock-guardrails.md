@@ -1,3 +1,12 @@
+---
+title: "AWS Bedrock Guardrails — 공부 자료 정리"
+date: 2026-05-30
+type: trend
+tags: [bedrock, guardrails, safety, aws, pii]
+source: [공홈, AWS docs]
+related: ["[[experiments/bedrock-guardrails/README]]"]
+---
+
 # AWS Bedrock Guardrails — 공부 자료 정리
 
 > 수집일: 2026-05-30 | 태그: `#guardrails` `#bedrock` `#safety`

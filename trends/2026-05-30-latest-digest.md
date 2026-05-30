@@ -1,3 +1,11 @@
+---
+title: "AI 최신 동향 온디맨드 리서치"
+date: 2026-05-30
+type: trend
+tags: [digest, weekly, anthropic, openai, google, aws, langchain, langfuse]
+source: [공홈, 블로그, 뉴스, X]
+---
+
 # AI 최신 동향 온디맨드 리서치
 
 > 수집일: 2026-05-30 | 소스: 공홈·블로그·뉴스·X | 태그: `#weekly` `#digest`

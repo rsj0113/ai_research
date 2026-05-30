@@ -1,3 +1,12 @@
+---
+title: "Agent Observability & Evaluation — 2026 동향"
+date: 2026-05-30
+type: trend
+tags: [observability, agent-eval, benchmark, langfuse, braintrust]
+source: [블로그, arXiv]
+related: ["[[2026-05-30-agent-evaluation]]", "[[2026-05-30-langfuse]]"]
+---
+
 # Agent Observability & Evaluation — 2026 동향
 
 > 수집일: 2026-05-30 | 태그: `#observability` `#agent-eval` `#benchmark`

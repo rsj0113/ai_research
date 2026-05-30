@@ -8,3 +8,8 @@ venv/
 *.egg-info/
 .pytest_cache/
 *.log
+
+# Obsidian — 세션 상태는 제외, 설정은 포함
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache

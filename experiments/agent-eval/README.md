@@ -1,3 +1,12 @@
+---
+title: "Agent Eval — LLM-as-Judge 기본 실험"
+date: 2026-05-30
+type: experiment
+tags: [agent-eval, llm-as-judge, anthropic]
+status: ready
+related: ["[[trends/2026-05-30-agent-evaluation]]"]
+---
+
 # Agent Eval — LLM-as-Judge 기본 실험
 
 에이전트 응답을 다른 LLM이 평가하는 가장 기본적인 패턴.

@@ -1,3 +1,12 @@
+---
+title: "Bedrock Guardrails 핸즈온"
+date: 2026-05-30
+type: experiment
+tags: [bedrock, guardrails, aws, safety, pii]
+status: ready
+related: ["[[trends/2026-05-30-bedrock-guardrails]]"]
+---
+
 # Bedrock Guardrails 핸즈온
 
 Bedrock Guardrails의 핵심 기능을 직접 실험. 가드레일 생성부터 실제 필터링까지.

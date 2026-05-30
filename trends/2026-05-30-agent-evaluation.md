@@ -1,3 +1,12 @@
+---
+title: "Agent Evaluation — 프레임워크 & 방법론 정리"
+date: 2026-05-30
+type: trend
+tags: [agent-eval, llm-as-judge, deepeval, ragas, benchmark]
+source: [블로그, arXiv, 공홈]
+related: ["[[experiments/agent-eval/README]]"]
+---
+
 # Agent Evaluation — 프레임워크 & 방법론 정리
 
 > 수집일: 2026-05-30 | 태그: `#agent-eval` `#llm-as-judge` `#deepeval` `#ragas`

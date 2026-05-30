@@ -1,3 +1,12 @@
+---
+title: "Langfuse 핸즈온"
+date: 2026-05-30
+type: experiment
+tags: [langfuse, observability, tracing, llm-as-judge]
+status: ready
+related: ["[[trends/2026-05-30-langfuse]]"]
+---
+
 # Langfuse 핸즈온
 
 Langfuse Cloud로 LLM tracing + LLM-as-judge 평가까지 한 번에 체험.
