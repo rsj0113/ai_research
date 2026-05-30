@@ -1,64 +1,46 @@
 """
 Step 1: Langfuse decorator API — 가장 빠르게 tracing 시작하는 법.
-실행 후 cloud.langfuse.com 대시보드에서 trace 확인.
+langfuse.openai 래퍼를 쓰면 OpenAI 호출이 자동으로 generation으로 기록됨.
 """
 
 import os
 from dotenv import load_dotenv
-from langfuse.decorators import langfuse_context, observe
+from langfuse import observe, get_client
 from langfuse.openai import openai  # Langfuse가 감싼 OpenAI 클라이언트
-import anthropic
 from rich.console import Console
 
 load_dotenv("../../.env")
 console = Console()
 
-# Anthropic 클라이언트 (수동으로 trace에 기록)
-anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+lf = get_client()
+client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
-@observe()  # 이 데코레이터 하나로 함수 전체가 trace에 기록됨
+@observe()
 def generate_answer(question: str) -> str:
-    """질문에 답변 생성. 내부 LLM 호출도 자동으로 generation으로 기록."""
+    """@observe()가 이 함수 전체를 span으로 기록. OpenAI 호출은 자동으로 generation으로 기록."""
+    lf.update_current_span(metadata={"experiment": "basic-tracing"})
 
-    # Langfuse에 현재 trace 메타데이터 추가
-    langfuse_context.update_current_trace(
-        name="Q&A pipeline",
-        tags=["experiment", "basic-tracing"],
-        metadata={"model": "claude-haiku-4-5"},
-    )
-
-    msg = anthropic_client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=512,
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": question}],
+        max_tokens=512,
     )
-    answer = msg.content[0].text
-
-    # 수동으로 LLM 호출 기록 (Anthropic은 자동 계측 미지원 시 이렇게)
-    langfuse_context.update_current_observation(
-        input=question,
-        output=answer,
-        usage={
-            "input": msg.usage.input_tokens,
-            "output": msg.usage.output_tokens,
-        },
-    )
-
-    return answer
+    return response.choices[0].message.content
 
 
 @observe()
 def rag_pipeline(question: str) -> str:
-    """RAG 파이프라인 시뮬레이션 — 검색 span + 생성 span이 중첩된 구조."""
+    """RAG 시뮬레이션 — 검색 span + generation이 자동으로 중첩 기록됨."""
+    retrieved = f"[검색된 문서] {question}에 관한 관련 내용..."
+    prompt = f"다음 컨텍스트를 바탕으로 답해줘.\n컨텍스트: {retrieved}\n질문: {question}"
 
-    # 검색 단계 (실제론 vector DB 호출)
-    with langfuse_context.current_span() if hasattr(langfuse_context, "current_span") else __import__("contextlib").nullcontext():
-        retrieved_context = f"[검색된 문서] {question}에 관한 관련 내용..."
-
-    # 생성 단계
-    answer = generate_answer(f"다음 컨텍스트를 바탕으로 답해줘.\n컨텍스트: {retrieved_context}\n질문: {question}")
-    return answer
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=512,
+    )
+    return response.choices[0].message.content
 
 
 if __name__ == "__main__":
@@ -72,4 +54,5 @@ if __name__ == "__main__":
         answer = generate_answer(q)
         console.print(f"[green]A:[/green] {answer[:200]}...")
 
+    lf.flush()
     console.print("\n[dim]→ cloud.langfuse.com 에서 trace 확인하세요[/dim]")

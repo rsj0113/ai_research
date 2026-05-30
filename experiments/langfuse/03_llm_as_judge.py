@@ -7,20 +7,16 @@ Langfuse 대시보드에서 trace별 점수 추이를 확인할 수 있음.
 import os
 import json
 from dotenv import load_dotenv
-from langfuse import Langfuse
-import anthropic
+from langfuse import get_client
+from openai import OpenAI
 from rich.console import Console
 from rich.table import Table
 
 load_dotenv("../../.env")
 console = Console()
 
-lf = Langfuse(
-    public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-    host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
-)
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+lf = get_client()
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 JUDGE_RUBRIC = """다음 응답을 평가하고 JSON으로만 답해라.
 
@@ -38,46 +34,63 @@ JSON 형식:
 
 
 def generate_and_evaluate(question: str) -> dict:
-    # 1. 응답 생성 + trace 기록
-    trace = lf.trace(name="llm-as-judge-demo", input=question, tags=["judge-eval"])
-
-    gen = trace.generation(name="answer-generation", model="claude-sonnet-4-6", input=question)
-    msg = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=512,
-        messages=[{"role": "user", "content": question}],
-    )
-    answer = msg.content[0].text
-    gen.end(
-        output=answer,
-        usage={"input": msg.usage.input_tokens, "output": msg.usage.output_tokens},
-    )
-
-    # 2. LLM-as-judge 평가
-    judge_gen = trace.generation(name="judge-evaluation", model="claude-haiku-4-5-20251001")
-    judge_prompt = JUDGE_RUBRIC.format(question=question, response=answer)
-    judge_msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
-        messages=[{"role": "user", "content": judge_prompt}],
-    )
-    scores = json.loads(judge_msg.content[0].text)
-    judge_gen.end(output=scores)
-
-    # 3. Langfuse trace에 점수 attach
-    for metric, value in scores.items():
-        if metric != "reasoning":
-            lf.score(
-                trace_id=trace.id,
-                name=metric,
-                value=value / 5.0,  # 0-1 정규화
-                comment=scores["reasoning"] if metric == "overall" else None,
+    with lf.start_as_current_observation(
+        name="llm-as-judge-demo",
+        as_type="span",
+        input=question,
+        metadata={"tags": ["judge-eval"]},
+    ):
+        # 1. 응답 생성
+        with lf.start_as_current_observation(name="answer-generation", as_type="generation"):
+            msg = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": question}],
+                max_tokens=512,
+            )
+            answer = msg.choices[0].message.content
+            lf.update_current_generation(
+                model="gpt-4o",
+                input=question,
+                output=answer,
+                usage_details={
+                    "input": msg.usage.prompt_tokens,
+                    "output": msg.usage.completion_tokens,
+                },
             )
 
-    trace.update(output=answer)
-    lf.flush()
+        # 2. LLM-as-judge 평가
+        judge_prompt = JUDGE_RUBRIC.format(question=question, response=answer)
+        with lf.start_as_current_observation(name="judge-evaluation", as_type="generation"):
+            judge_msg = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": judge_prompt}],
+                max_tokens=256,
+                response_format={"type": "json_object"},
+            )
+            scores = json.loads(judge_msg.choices[0].message.content)
+            lf.update_current_generation(
+                model="gpt-4o-mini",
+                input=judge_prompt,
+                output=scores,
+                usage_details={
+                    "input": judge_msg.usage.prompt_tokens,
+                    "output": judge_msg.usage.completion_tokens,
+                },
+            )
 
-    return {"trace_id": trace.id, "answer": answer, "scores": scores}
+        # 3. 점수를 trace에 attach
+        for metric, value in scores.items():
+            if metric != "reasoning":
+                lf.score_current_trace(
+                    name=metric,
+                    value=value / 5.0,  # 0-1 정규화
+                    comment=scores["reasoning"] if metric == "overall" else None,
+                )
+
+        lf.update_current_span(output={"answer": answer, "scores": scores})
+
+    lf.flush()
+    return {"answer": answer, "scores": scores}
 
 
 TEST_QUESTIONS = [

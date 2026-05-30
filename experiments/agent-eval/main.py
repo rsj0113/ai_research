@@ -1,12 +1,13 @@
 """
 LLM-as-Judge 기본 실험.
-에이전트 응답을 다른 Claude 인스턴스가 평가한다.
+에이전트 응답을 다른 LLM 인스턴스가 평가한다. Langfuse tracing 포함.
 """
 
 import os
 import json
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
+from langfuse import get_client, observe
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -14,7 +15,8 @@ from rich.table import Table
 load_dotenv("../../.env")
 
 console = Console()
-client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+lf = get_client()
 
 EVAL_RUBRIC = """
 다음 기준으로 응답을 1~5점으로 평가해라. JSON으로만 응답해라.
@@ -35,40 +37,64 @@ EVAL_RUBRIC = """
 """
 
 
-def generate_response(question: str, model: str = "claude-sonnet-4-6") -> str:
-    msg = client.messages.create(
+@observe(as_type="generation")
+def generate_response(question: str, model: str = "gpt-4o") -> str:
+    msg = client.chat.completions.create(
         model=model,
         max_tokens=512,
         messages=[{"role": "user", "content": question}],
     )
-    return msg.content[0].text
+    answer = msg.choices[0].message.content
+    lf.update_current_generation(
+        model=model,
+        input=question,
+        output=answer,
+        usage_details={
+            "input": msg.usage.prompt_tokens,
+            "output": msg.usage.completion_tokens,
+        },
+    )
+    return answer
 
 
-def evaluate_response(question: str, response: str, model: str = "claude-haiku-4-5-20251001") -> dict:
-    prompt = f"""질문: {question}
-
-응답: {response}
-
-{EVAL_RUBRIC}"""
-    msg = client.messages.create(
+@observe(as_type="generation")
+def evaluate_response(question: str, response: str, model: str = "gpt-4o-mini") -> dict:
+    prompt = f"질문: {question}\n\n응답: {response}\n\n{EVAL_RUBRIC}"
+    msg = client.chat.completions.create(
         model=model,
         max_tokens=256,
         messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
     )
-    return json.loads(msg.content[0].text)
+    scores = json.loads(msg.choices[0].message.content)
+    lf.update_current_generation(
+        model=model,
+        input=prompt,
+        output=scores,
+        usage_details={
+            "input": msg.usage.prompt_tokens,
+            "output": msg.usage.completion_tokens,
+        },
+    )
+    return scores
 
 
+@observe()
 def run_eval(question: str):
     console.print(f"\n[bold blue]Q:[/bold blue] {question}")
 
     with console.status("응답 생성 중..."):
         response = generate_response(question)
-    console.print(Panel(response, title="응답 (claude-sonnet-4-6)", border_style="green"))
+    console.print(Panel(response, title="응답 (gpt-4o)", border_style="green"))
 
     with console.status("평가 중..."):
         scores = evaluate_response(question, response)
 
-    table = Table(title="평가 결과 (claude-haiku-4-5 judge)")
+    for metric, value in scores.items():
+        if metric != "reasoning":
+            lf.score_current_trace(name=metric, value=value / 5.0)
+
+    table = Table(title="평가 결과 (gpt-4o-mini judge)")
     table.add_column("기준", style="cyan")
     table.add_column("점수", justify="center")
     for key in ["accuracy", "completeness", "conciseness", "overall"]:
@@ -84,3 +110,5 @@ if __name__ == "__main__":
     ]
     for q in test_questions:
         run_eval(q)
+
+    lf.flush()
