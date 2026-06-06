@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv("/Users/seonjin/ai_research/.env")
+load_dotenv()
 
 SLACK_WEBHOOK_URL = os.environ["SLACK_WEBHOOK_URL"]
 openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
