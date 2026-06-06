@@ -1,89 +1,89 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+이 파일은 Claude Code(claude.ai/code)가 이 저장소에서 작업할 때 참고하는 안내 문서입니다.
 
-## Project Overview
+## 프로젝트 개요
 
-This is an **AI Research Hub** — a personal lab combining trend monitoring with hands-on experimentation. There are two distinct workspaces:
+이 저장소는 **AI Research Hub** — 트렌드 모니터링과 실습 실험을 결합한 개인 연구 공간입니다. 두 개의 작업 영역으로 구성됩니다:
 
-- `trends/` — Markdown research notes collected by Claude (automated and on-demand)
-- `experiments/` — Self-contained Python experiment folders, each independently runnable
+- `trends/` — Claude가 수집한 Markdown 리서치 노트 (자동 수집 및 온디맨드)
+- `experiments/` — 독립적으로 실행 가능한 Python 실험 폴더 모음
 
-The vault doubles as an [Obsidian](https://obsidian.md) knowledge base; `Home.md` serves as the dashboard and uses Dataview queries to surface recent trends and experiment status.
+저장소는 [Obsidian](https://obsidian.md) 지식 베이스로도 활용되며, `Home.md`가 대시보드 역할을 하며 Dataview 쿼리로 최신 트렌드와 실험 현황을 표시합니다.
 
-## Environment Setup
+## 환경 설정
 
-All secrets live in `.env` (not committed). Copy `.env.example` and fill in the keys you need for the experiment you're running:
+모든 시크릿은 `.env`에 저장합니다(커밋 제외). `.env.example`을 복사한 뒤 실행할 실험에 필요한 키를 채워 넣습니다:
 
 ```bash
 cp .env.example .env
 ```
 
-Required keys per area:
-- **Anthropic experiments**: `ANTHROPIC_API_KEY`
-- **OpenAI / Azure experiments**: `OPENAI_API_KEY` (and Azure keys if needed)
-- **Bedrock experiments**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`
-- **Langfuse tracing**: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`
-- **AI digest script**: `SLACK_WEBHOOK_URL`, `TWITTER_BEARER_TOKEN` (optional)
+영역별 필수 키:
+- **Anthropic 실험**: `ANTHROPIC_API_KEY`
+- **OpenAI / Azure 실험**: `OPENAI_API_KEY` (Azure 사용 시 추가 키 필요)
+- **Bedrock 실험**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`
+- **Langfuse 트레이싱**: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`
+- **AI 다이제스트 스크립트**: `SLACK_WEBHOOK_URL`, `TWITTER_BEARER_TOKEN` (선택)
 
-## Running Experiments
+## 실험 실행
 
-Each experiment folder is self-contained with its own `requirements.txt`. The general pattern:
+각 실험 폴더는 독립적인 `requirements.txt`를 가집니다. 기본 실행 패턴:
 
 ```bash
 cd experiments/<topic>
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python main.py          # or the numbered script: python 01_create_guardrail.py
+python main.py          # 또는 번호 스크립트: python 01_create_guardrail.py
 ```
 
-### Bedrock Guardrails (run scripts in order)
+### Bedrock Guardrails (순서대로 실행 필수)
 
 ```bash
 cd experiments/bedrock-guardrails
-python 01_create_guardrail.py   # creates guardrail → outputs guardrailId/version for .env
-python 02_apply_guardrail.py    # tests guardrail independently (no LLM call)
-python 03_converse_with_guardrail.py  # full Claude conversation with guardrail active
+python 01_create_guardrail.py          # 가드레일 생성 → guardrailId/version 출력 후 .env에 기록
+python 02_apply_guardrail.py           # LLM 호출 없이 가드레일 단독 테스트
+python 03_converse_with_guardrail.py   # 가드레일 적용 상태에서 Claude와 실제 대화
 ```
 
-`01_create_guardrail.py` must run first — it creates the AWS resource whose ID is required by the subsequent scripts.
+`01_create_guardrail.py`를 반드시 먼저 실행해야 합니다. 이후 스크립트들이 여기서 생성된 AWS 리소스 ID를 필요로 합니다.
 
-### AI Digest Script
+### AI 다이제스트 스크립트
 
 ```bash
 cd scripts
 python ai_digest.py
 ```
 
-Pulls from HackerNews (Algolia API), arXiv (XML feed), YouTube RSS, and optionally Threads/X. Translates titles to Korean via GPT-4o-mini and posts to Slack.
+HackerNews(Algolia API), arXiv(XML 피드), YouTube RSS, 선택적으로 Threads/X에서 데이터를 수집합니다. GPT-4o-mini로 제목을 한국어로 번역한 뒤 Slack으로 전송합니다.
 
-## Architecture
+## 아키텍처
 
-### Experiment Design Pattern
+### 실험 설계 패턴
 
-Each experiment folder follows a layered demonstration structure — numbered scripts build on each other (e.g., `01_` creates infrastructure, `02_` applies it standalone, `03_` integrates with an LLM). The pattern applies to both Langfuse (basic tracing → manual tracing → LLM-as-judge) and Bedrock Guardrails.
+각 실험 폴더는 번호 스크립트가 단계적으로 쌓이는 구조를 따릅니다 (`01_`은 인프라 생성, `02_`는 독립 적용, `03_`은 LLM 통합). Langfuse(기본 트레이싱 → 수동 트레이싱 → LLM-as-judge)와 Bedrock Guardrails 모두 이 패턴을 공유합니다.
 
-Within scripts, the common flow is:
-1. Load env via `python-dotenv`
-2. Initialize SDK clients (Anthropic, OpenAI, Boto3, Langfuse)
-3. Define test cases or prompts inline
-4. Run with `rich` console output (tables, panels) for visual validation
+스크립트 내부의 공통 흐름:
+1. `python-dotenv`로 환경 변수 로드
+2. SDK 클라이언트 초기화 (Anthropic, OpenAI, Boto3, Langfuse)
+3. 테스트 케이스 또는 프롬프트 인라인 정의
+4. `rich` 라이브러리로 콘솔 출력 (테이블, 패널) → 시각적 검증
 
-### LLM-as-Judge Pattern (`experiments/agent-eval/`, `experiments/langfuse/03_llm_as_judge.py`)
+### LLM-as-Judge 패턴 (`experiments/agent-eval/`, `experiments/langfuse/03_llm_as_judge.py`)
 
-A generator LLM produces a response; a separate judge LLM scores it against a rubric (accuracy, completeness, conciseness). Scores are normalized 0–1 and — when Langfuse is active — attached to the trace as scores so they appear in the dashboard.
+생성 LLM이 응답을 만들면, 별도의 평가 LLM이 루브릭(정확성, 완성도, 간결성)에 따라 점수를 매깁니다. 점수는 0–1로 정규화되며, Langfuse 활성 시 트레이스에 score로 첨부되어 대시보드에서 확인할 수 있습니다.
 
-### Langfuse Integration
+### Langfuse 통합
 
-Two tracing styles are used across experiments:
-- **Decorator-based** (`@observe()`): wraps functions automatically — used in `01_basic_tracing.py`
-- **Manual context manager** (`start_as_current_observation()`): explicit span/generation control — used in `02_manual_tracing.py`
+실험 전반에 걸쳐 두 가지 트레이싱 방식이 사용됩니다:
+- **데코레이터 방식** (`@observe()`): 함수를 자동으로 감싸 스팬 기록 — `01_basic_tracing.py`에서 사용
+- **수동 컨텍스트 매니저** (`start_as_current_observation()`): 스팬/제너레이션 직접 제어 — `02_manual_tracing.py`에서 사용
 
-The `langfuse.openai.openai` client drop-in replaces the standard OpenAI client to auto-capture generations.
+`langfuse.openai.openai` 클라이언트는 표준 OpenAI 클라이언트의 드롭인 대체재로, 제너레이션을 자동으로 캡처합니다.
 
-### Trends Workflow
+### 트렌드 작성 규칙
 
-Trend files in `trends/` use frontmatter:
+`trends/` 의 노트는 다음 프론트매터를 사용합니다:
 
 ```yaml
 ---
@@ -93,8 +93,8 @@ sources: [url1, url2]
 ---
 ```
 
-The `Home.md` Dataview query surfaces the 10 most recent entries sorted by `date`. When adding a new trend note, use `templates/trend.md` as the base. New experiment notes should use `templates/experiment.md`.
+`Home.md`의 Dataview 쿼리는 `date` 기준으로 최신 10개 항목을 표시합니다. 새 트렌드 노트 작성 시 `templates/trend.md`를, 새 실험 노트 작성 시 `templates/experiment.md`를 기반으로 사용합니다.
 
-### Daily Logs
+### 데일리 로그
 
-Work-in-progress notes and next steps live in `daily/YYYY-MM-DD.md`. These are informal and not templated.
+작업 진행 상황과 다음 단계 메모는 `daily/YYYY-MM-DD.md`에 기록합니다. 형식은 자유롭고 템플릿을 사용하지 않습니다.
